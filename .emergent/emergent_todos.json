@@ -1,0 +1,58 @@
+[
+  {
+    "content": "Pulihkan lingkungan + ukur titik henti dengan gate.sh --full (9 gate merah teridentifikasi)",
+    "status": "completed"
+  },
+  {
+    "content": "A1: check_nav_map.py — ROLES dibaca dari SSOT config/roles.js → KeyError 'designer' hilang",
+    "status": "completed"
+  },
+  {
+    "content": "A2: POC E-8 G1 + role_registry self-test — asersi paritas server↔layar, bukan angka 6 (64/64)",
+    "status": "completed"
+  },
+  {
+    "content": "A3: 3 panel mati `designer` disembuhkan (2 di akarnya: endpoint salah-tempat dipindah · 1 dengan endpoint baru /design/reports/mine + tab 'Rapor Saya')",
+    "status": "completed"
+  },
+  {
+    "content": "B1: INV-APPR-01 — pintu design-requests approve|reject di DOOR_QUEUE (221 cek hijau)",
+    "status": "completed"
+  },
+  {
+    "content": "B2: INV-HOME-01 — hitung-ulang `design_request` di verify_home_kpi.EXPECT (80 cek hijau)",
+    "status": "completed"
+  },
+  {
+    "content": "B3: POC F-6 (43/43) & F-6.7 (41/41) hijau — 'harga langganan' DIVERIFIKASI sebagai rembesan",
+    "status": "completed"
+  },
+  {
+    "content": "C1+C2: POC E-4 (56/0) & E-8 G2/G3 (97/97) — akar TERBUKTI artefak lingkungan; .restore_env.sh dikeraskan (mongo-hidup + verifikasi fondasi gagal-berisik)",
+    "status": "completed"
+  },
+  {
+    "content": "D1: `design_requests` didaftarkan di ENTITY_REGISTRY.md (validate_compliance 22 PASS/0 FAIL)",
+    "status": "completed"
+  },
+  {
+    "content": "D2: POC baru test_core_design_request_poc.py — 55/55, idempotent 4×, nol residu, terdaftar di gate.sh",
+    "status": "completed"
+  },
+  {
+    "content": "D3: D-US1..D-US4 DIVERIFIKASI SENDIRI di peramban + data demo dipulihkan",
+    "status": "completed"
+  },
+  {
+    "content": "Verifikasi penutup: gate.sh --full HIJAU 3× (145 PASS/0 FAIL) · verify_data_integrity 237/0/0 · build FE bersih · nol residu",
+    "status": "completed"
+  },
+  {
+    "content": "testing_agent_v3: iter 236 backend 18/20 (nol bug kritis) + iter 237 frontend 7/9 (zero dead panels, regresi bersih); temuan LOW 'KNSelect' DIREPRODUKSI & terbukti tuduhan palsu; residu agen uji dibersihkan",
+    "status": "completed"
+  },
+  {
+    "content": "Dokumentasi: plan.md §STATUS D + SESSION_HANDOFF.md + ENTITY_REGISTRY.md + memory/test_credentials.md + test_result.md",
+    "status": "completed"
+  }
+]
