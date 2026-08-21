@@ -569,8 +569,21 @@ async def backfill(dry_run: bool = True) -> Dict[str, Any]:
                          "dst_id": row[fk], "rel": rel, "note": note})
 
     # Rantai pembelian
+    # P-0 (2026-08-20) — BUG YANG DITEMUKAN & DITUTUP: baris ini dulu berbunyi
+    #     rule("purchase_order", "purchase_requisition", "parent",
+    #          "purchase_requisitions", "po_id", ...)
+    # yaitu MENGITERASI koleksi PR tetapi mengaku `src_type="purchase_order"`, dan
+    # memakai `row["id"]` (id PR!) sebagai id PO sekaligus `row["po_id"]` (id PO)
+    # sebagai id PR. Jadi src & dst TERTUKAR, keduanya. Akibatnya `load_doc(
+    # "purchase_order", "<id PR>")` selalu None → `link()` mengembalikan
+    # `{"linked": 0, "reason": "dokumen tidak ditemukan"}` dan baris itu **di-skip
+    # DIAM-DIAM**. Terukur sebelum perbaikan: `backfill(dry_run=True)` →
+    # `candidates=74 · would_add=0 · skipped=1`, dan `skipped=1` itu PERSIS baris ini.
+    # Artinya rantai PO→PR **tidak pernah sekali pun** ter-backfill sejak dibuat —
+    # dan justru rantai inilah prasyarat kolom "Nama Sales" di papan PO (DRIFT D3).
+    # Arah yang benar: iterasi `purchase_orders` dengan FK `pr_id` (field kanonik P-0).
     await rule("purchase_order", "purchase_requisition", "parent",
-               "purchase_requisitions", "po_id", note="PR sumber PO")
+               "purchase_orders", "pr_id", note="PR sumber PO")
     await rule("grn", "purchase_order", "parent", "wms_tasks", "po_id",
                flt={"flow_type": "inbound"}, note="penerimaan dari PO")
     await rule("vendor_bill", "purchase_order", "parent", "vendor_bills", "po_id",

@@ -14,6 +14,7 @@ from services.po_amendment_service import amend_po as amend_po_service
 from services import blanket_po_service
 from services import grade_service          # Fase A · PS-09/D-19
 from services import line_scope             # FASE L — pagar & penyaring lini produk
+from services import pr_sourcing_service as _pr_sourcing  # P-0 — asal dokumen PO
 # FASE E/F-1 — katalog barang supplier (nama/kode + satuan supplier) untuk baris PO
 from services import supplier_item_service as _sis
 from domain_registry import DomainValidationError
@@ -512,6 +513,14 @@ async def _create_po_core(payload: PurchaseOrderCreate, actor: Dict[str, Any], *
     po = {
         "id": new_id("po"),
         "po_number": po_number,
+        # P-0 (prasyarat FASE P) — PO manual TIDAK punya PR/SO asal, tetapi field-nya
+        # tetap ADA dan kosong. Alasannya bukan kerapian: papan PO harus bisa
+        # membedakan "PO ini memang bukan dari pesanan" (sel kosong yang JUJUR) dari
+        # "dokumen lama yang belum punya field" — dua hal yang tampak sama di layar.
+        # Nama Sales SENGAJA tidak diisi nama pembuat PO: memaksanya akan membuat papan
+        # PO berbohong tentang siapa yang menjual.
+        **_pr_sourcing.PO_ORIGIN_EMPTY,
+        "source": "manual",
         "po_type": po_type,
         "parent_po_id": (parent or {}).get("id", ""),
         "parent_po_number": (parent or {}).get("po_number", ""),

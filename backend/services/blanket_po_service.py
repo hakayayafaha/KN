@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Tuple
 from fastapi import HTTPException
 
 from db import db
+from services import pr_sourcing_service as _pr_sourcing  # P-0 — asal dokumen PO
 from core_utils import new_id, now_iso, safe_doc, DEFAULT_ENTITY_ID, timeline_entry, next_doc_number, rupiah
 from request_context import active_entity_or
 
@@ -95,6 +96,11 @@ async def create_blanket(payload, actor: Dict[str, Any]) -> Dict[str, Any]:
     actor_name = payload.created_by or actor.get("name", "Admin")
     doc = {
         "id": new_id("po"), "po_number": po_number, "po_type": "blanket",
+        # P-0 — kontrak payung (blanket PO) juga dokumen `purchase_orders`, jadi
+        # field asal-dokumen wajib ADA & kosong. Kontrak payung memang tidak lahir
+        # dari PR/SO: ia perjanjian harga, bukan pesanan atas permintaan.
+        **_pr_sourcing.PO_ORIGIN_EMPTY,
+        "source": "blanket",
         "supplier_id": sid, "supplier_name": sname, "supplier_contact": scontact, "supplier_npwp": snpwp,
         "warehouse_id": payload.warehouse_id, "warehouse_name": wh.get("name", ""),
         "warehouse_city": wh.get("city", ""),

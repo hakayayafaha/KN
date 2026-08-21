@@ -153,6 +153,75 @@ def _so_ids_of_pr(pr: Dict[str, Any]) -> List[str]:
     return out
 
 
+async def _sales_of_so_ids(so_ids: List[str]) -> Dict[str, str]:
+    """Runut **Nama Sales** dari pesanan penjualan yang melahirkan PO ini (P-0).
+
+    Ini bagian yang membuat rantai PO→PR→SO ADA GUNANYA: papan PO (FASE P) memuat
+    kolom **Nama Sales**, dan sebelum ini kolom itu mustahil diisi tanpa mengetik
+    ulang — terukur **0/14** PO menyimpan `pr_id` (DRIFT D3).
+
+    DUA ATURAN YANG SENGAJA:
+    1. **Di-snapshot saat PO lahir**, bukan dihitung saat dibaca. Kalau akun sales
+       kelak dinonaktifkan atau namanya berubah, PO lama tetap menyebut siapa yang
+       benar-benar menjual — prinsip "snapshot historis" yang sama dipakai kategori
+       & harga di dokumen lain.
+    2. **KOSONG kalau memang tidak ada**, bukan diisi nama pembuat PO. PO pembelian
+       rutin (stok menipis, reorder) TIDAK punya sales — memaksa isinya akan membuat
+       papan PO berbohong, dan itu lebih buruk daripada sel kosong yang jujur.
+
+    `sales_orders` menyimpan `created_by` = **id pengguna** (bukan nama) dan
+    `sales_name` = nama tampilan; keduanya dipakai apa adanya, tidak ditebak.
+    """
+    if not so_ids:
+        return {"sales_user_id": "", "sales_name": ""}
+    rows = await db.sales_orders.find(
+        {"id": {"$in": list(so_ids)}},
+        {"_id": 0, "id": 1, "created_by": 1, "sales_name": 1, "created_at": 1},
+    ).to_list(50)
+    if not rows:
+        return {"sales_user_id": "", "sales_name": ""}
+    # Kalau satu PR menggabungkan beberapa SO, pakai yang TERTUA (pesanan pemicu).
+    rows.sort(key=lambda r: str(r.get("created_at") or ""))
+    for r in rows:
+        nama = (r.get("sales_name") or "").strip()
+        uid = (r.get("created_by") or "").strip()
+        if nama or uid:
+            return {"sales_user_id": uid, "sales_name": nama}
+    return {"sales_user_id": "", "sales_name": ""}
+
+
+#: Field asal-dokumen yang WAJIB ada di SETIAP PO, apa pun jalur lahirnya (P-0).
+#: Ditulis eksplisit supaya papan PO (FASE P) tidak perlu membedakan "field tidak ada"
+#: dari "tidak ada sales-nya" — dua hal yang tampak sama di layar tetapi beda artinya.
+PO_ORIGIN_EMPTY: Dict[str, Any] = {
+    "pr_id": "", "pr_number": "", "source": "", "source_so_ids": [],
+    "sales_user_id": "", "sales_name": "",
+}
+
+
+async def po_origin_from_pr(pr: Optional[Dict[str, Any]], *,
+                            source: str = "pr") -> Dict[str, Any]:
+    """SATU definisi "PO ini asalnya dari mana & siapa sales-nya" (P-0).
+
+    Dipakai KETIGA jalur lahirnya PO — realisasi PR (`realize_to_po`), award RFQ
+    (`rfq_service.award`), dan PO manual (`routers/purchase_orders`) — supaya
+    ketiganya tidak bisa diam-diam berbeda. Sebelum P-0 hanya jalur PR yang menulis
+    `pr_id`, jadi isi kolom papan PO bergantung pintu masuknya: cacat yang gejalanya
+    bukan galat melainkan **kolom yang kosong untuk sebagian dokumen saja**.
+
+    `pr` None/kosong → seluruh field ADA tetapi kosong (bukan tidak ada).
+    """
+    if not pr:
+        return dict(PO_ORIGIN_EMPTY)
+    so_ids = _so_ids_of_pr(pr)
+    return {
+        "pr_id": pr.get("id", ""), "pr_number": pr.get("number", ""),
+        "source": source, "source_so_ids": so_ids,
+        **await _sales_of_so_ids(so_ids),
+    }
+
+
+
 def _open_lines(pr: Dict[str, Any], mode: str, line_nos: Optional[List[int]] = None) -> List[Dict[str, Any]]:
     want = {int(n) for n in (line_nos or [])}
     out = []
@@ -348,6 +417,9 @@ async def realize_to_po(pr_id: str, *, supplier_id: str, actor: Dict[str, Any],
     sup_contact = " | ".join([x for x in [supplier.get("pic_name", ""), supplier.get("phone", "")] if x])
     now = now_iso()
     actor_name = actor.get("name", "Admin")
+    # P-0 — runut asal dokumen & Nama Sales SEBELUM PO dibentuk, lewat SATU definisi
+    # bersama (`po_origin_from_pr`) yang juga dipakai jalur award RFQ & PO manual.
+    _origin = await po_origin_from_pr(pr, source="pr")
     po = {
         "id": new_id("po"),
         "po_number": await next_doc_number("purchase_orders", "po_number", "PO-", entity_id=entity_id),
@@ -383,6 +455,9 @@ async def realize_to_po(pr_id: str, *, supplier_id: str, actor: Dict[str, Any],
         # `source="so_repeat"` + `source_ref_id`), bukan diketik.
         "pr_id": pr_id, "pr_number": pr["number"], "source": "pr",
         "source_so_ids": _so_ids_of_pr(pr),
+        # P-0 — kolom "Nama Sales" papan PO: DIRUNUT dari SO asal, tidak diketik.
+        # Sengaja KOSONG untuk PO pembelian rutin (lihat `_sales_of_so_ids`).
+        **_origin,
         "contract_ids": sorted(used_contracts),
         # R6.3 — Budget Control: tag anggaran (default akun Persediaan bila tak di-tag)
         "budget_dimension": "", "budget_key": "",

@@ -202,6 +202,14 @@ async def _create_po_from_lines(supplier_id: str, lines: List[Dict[str, Any]],
 
     sup_contact = " | ".join([x for x in [supplier.get("pic_name", ""), supplier.get("phone", "")] if x])
     now = now_iso()
+    # P-0 — asal dokumen & Nama Sales lewat SATU definisi bersama. RFQ yang lahir dari
+    # PR membawa `pr_id`; PR itu yang menyimpan jejak SO asal (`source="so_repeat"`).
+    from services.pr_sourcing_service import po_origin_from_pr
+    _pr_doc = (await db.purchase_requisitions.find_one({"id": rfq["pr_id"]}, {"_id": 0})
+               if rfq.get("pr_id") else None)
+    _origin = await po_origin_from_pr(_pr_doc, source="pr")
+    if not _pr_doc:
+        _origin["source"] = "rfq"
     po = {
         "id": new_id("po"), "po_number": await next_doc_number("purchase_orders", "po_number", "PO-", entity_id=entity_id),
         "supplier_id": supplier_id, "supplier_name": supplier.get("name", ""),
@@ -227,11 +235,11 @@ async def _create_po_from_lines(supplier_id: str, lines: List[Dict[str, Any]],
         "payment_status": "unpaid", "payments": [],
         "source_rfq_id": rfq["id"], "source_rfq_number": rfq["rfq_number"],
         "source_pr_id": rfq.get("pr_id", ""), "source_pr_number": rfq.get("pr_number", ""),
-        # P-0 (prasyarat FASE P) — nama field kanonik rantai PO → PR → SO. PO hasil
-        # award RFQ boleh berasal dari PR (RFQ dibuat dari PR) atau berdiri sendiri.
-        "pr_id": rfq.get("pr_id", ""), "pr_number": rfq.get("pr_number", ""),
-        "source": "pr" if rfq.get("pr_id") else "rfq",
-        "source_so_ids": [],
+        # P-0 (prasyarat FASE P) — asal dokumen & Nama Sales lewat SATU definisi
+        # bersama. PO hasil award RFQ boleh lahir dari PR (RFQ dibuat dari PR) atau
+        # berdiri sendiri; kalau dari PR, rantai SO-nya ikut terbawa sehingga papan PO
+        # bisa menyebut sales-nya tanpa mengetik.
+        **_origin,
         "timeline": [timeline_entry("created", f"PO dibuat dari {rfq['rfq_number']}",
                                     actor.get("name", "Admin"), f"{len(raw_items)} item · {rupiah(total_amount)}")],
         "created_by": actor.get("name", "Admin"), "created_by_id": actor.get("id", ""),
